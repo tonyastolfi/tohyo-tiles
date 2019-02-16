@@ -6,7 +6,7 @@ function make_tile(id, str) {
   var i = Math.floor(Math.random() * 6) + 1;
   return [
     "<div class='tile' id='tile_", id.toString(), "'>",
-    "<div style='position:relative; width:120px; height:120px;'><img class='container' src='tile_",
+    "<div class='outer'><img class='container' src='tile_",
     i.toString(), ".png'>", "<div class='container'>",
     eval(str.split('').join('+')), "</div>", "</div>", "</div>"
   ].join('');
