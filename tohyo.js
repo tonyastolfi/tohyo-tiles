@@ -32,6 +32,40 @@ function rotate_xy(x, y, deg) {
   }
 }
 
+function dot_to_cell(x) { return Math.floor(x / 3); }
+
+function dot_to_inner(x) { return mod(x, 3); }
+
+function to_dot(cell_x, inner_x) { return cell_x * 3 + inner_x; }
+
+function parse_dot(id) {
+  var v = $.map($(id.split('_')), function(n) {
+             return parseInt(n, 10);
+           }).splice(1);
+  return {
+    index : v[0],
+    id : id,
+    cell_x : v[1],
+    cell_y : v[2],
+    inner_x : v[3],
+    inner_y : v[4],
+    x : to_dot(v[1], v[3]),
+    y : to_dot(v[2], v[4]),
+  };
+}
+
+function dot_to_string(board, dot) {
+  var tile_index = board_get(board, dot.cell_x, dot.cell_y).index;
+  return [
+    "dot",
+    tile_index.toString(),
+    dot.cell_x.toString(),
+    dot.cell_y.toString(),
+    dot.inner_x.toString(),
+    dot.inner_y.toString(),
+  ].join('_');
+}
+
 function make_tile(id, str, rotate, placed) {
   var i = Math.floor(Math.random() * 6) + 1;
   if (id in tile_blank) {
@@ -172,6 +206,7 @@ function setup() {
   }
 }
 
+var last_move_id = undefined;
 var bag = [];
 var tile_spin = {};
 
@@ -289,7 +324,7 @@ function board_get(board, x, y) {
   return board[x][y];
 }
 
-function board_dot(board, x, y) {
+function board_dot_color(board, x, y) {
   var cell_x = Math.floor(x / 3);
   var cell_y = Math.floor(y / 3);
   var cell = board_get(board, cell_x, cell_y);
@@ -358,17 +393,27 @@ function place_tile(board, x, y, tile_index) {
   });
   update_options(board);
   render_board(board);
+  last_move_id = ["#tile",tile_index.toString(), x.toString(), y.toString()].join('_');
 }
 
-function draw_tile() {
+function draw_tile(dst_id, append) {
+  if (!dst_id) {
+    dst_id = 'public_tray';
+  }
+  
   // Pick a tile uniformly at random from the bag.
   //
   var t = take_random(bag);
 
   // Add the tile to the public tray.
   //
-  $("#public_tray").html(make_tile(t, tile_faces[t]));
-  $("#preview_tray").html(make_tile(t + "_preview", tile_faces[t]));
+  var tile_src = make_tile(t, tile_faces[t]);
+  if (append) {
+    $("#" + dst_id).append($.parseHTML(tile_src));
+  } else {
+    $("#" + dst_id).html(tile_src);
+  }
+  //$("#preview_tray").html(make_tile(t + "_preview", tile_faces[t]));
 
   // Add behaviors: draggable, bring-to-front, spinnable.
   //
@@ -395,16 +440,22 @@ function district_of(board, x, y) {
   var visited = {};
   visited[key_of(x, y)] = true;
   var stack = [ key_of(x, y) ];
-  var d = {w_count : 0, b_count : 0, dots : []};
+  var d = {w_count : 0, b_count : 0, dots : [], open : {}};
+  var extents = find_extents(board).revealed;
   while (stack.length > 0) {
     var next = stack.pop();
     var parts = next.split('_');
     var x = parseInt(parts[0]), y = parseInt(parts[1]);
-    var dot = board_dot(board, x, y);
-    if (dot !== 'w' && dot !== 'b') {
+    var cell_x = Math.floor(x / 3), cell_y = Math.floor(y / 3);
+    var color = board_dot_color(board, x, y);
+    if (color !== 'w' && color !== 'b') {
+      var cell = board_get(board, cell_x, cell_y);
+      if (cell !== undefined && cell["type"] === 'option') {
+        d.open[key_of(cell_x, cell_y)] = true;
+      }
       continue;
     }
-    switch (dot) {
+    switch (color) {
     case 'w':
       d.w_count += 1;
       break;
@@ -412,7 +463,14 @@ function district_of(board, x, y) {
       d.b_count += 1;
       break;
     }
-    d.dots.push([ x, y ]);
+    d.dots.push({
+      x : x,
+      y : y,
+      cell_x : dot_to_cell(x),
+      cell_y : dot_to_cell(y),
+      inner_x : dot_to_inner(x),
+      inner_y : dot_to_inner(y),
+    });
     if (!(key_of(x - 1, y) in visited)) {
       visited[key_of(x - 1, y)] = true;
       stack.push(key_of(x - 1, y));
@@ -433,7 +491,10 @@ function district_of(board, x, y) {
   return d;
 }
 
-function render_board(board) {
+function render_board(board, score) {
+  if (!score) {
+    score = {white: 0, black: 0, tie: 0};
+  }
   // Generate the HTML for the board.
   //
   var tile_ids = [];
@@ -473,46 +534,127 @@ function render_board(board) {
       var y = parseInt(parts[2], 10);
       ui.draggable.remove();
       place_tile(board, x, y, dropped_tile);
-      draw_tile();
+      
+      // Now the bot moves...
+      //
+      make_random_move(board);
+      render_board(board);
     }
   });
 
   $(".tile.placed .overlay_cell")
       .mouseenter(function() {
-        var i = $(this)[0].id;
-        var v = $.map($(i.split('_')), function(n) {
-                   return parseInt(n, 10);
-                 }).splice(1);
-        var x = v[1] * 3 + v[3];
-        var y = v[2] * 3 + v[4];
-        var d = district_of(board, x, y);
-        $("#private_tray").html([
-          i, ": ", board_dot(board, x, y), "<br>black: ", d.b_count,
-          "<br>white:", d.w_count
-        ].join(''));
-        console.log('------------------------');
-        for (var j = 0; j < d.dots.length; ++j) {
-          var cell_x = Math.floor(d.dots[j][0] / 3);
-          var cell_y = Math.floor(d.dots[j][1] / 3);
-          var inner_x = mod(d.dots[j][0], 3);
-          var inner_y = mod(d.dots[j][1], 3);
-          var tile_index = board_get(board, cell_x, cell_y).index;
+        var id_str = $(this)[0].id;
+        var dot = parse_dot(id_str);
+        var district = district_of(board, dot.x, dot.y);
 
-          var dot_id = [
-            "#dot",
-            tile_index.toString(),
-            cell_x.toString(),
-            cell_y.toString(),
-            inner_x.toString(),
-            inner_y.toString(),
-          ].join('_');
-          console.log(dot_id);
-          $(dot_id).addClass('dot_hover');
-        }
-        console.log('------------------------');
+        $("#info_tray").html([
+          id_str,
+          ": ",
+          board_dot_color(board, dot.x, dot.y),
+          "<br>black: ",
+          district.b_count,
+          "<br>white:",
+          district.w_count,
+          "<br>open:",
+          Object.keys(district.open).length,
+          "<br>",
+          JSON.stringify(district.open),
+        ].join(''));
+
+        $.each(district.dots, function(n, member) {
+          $('#' + dot_to_string(board, member)).addClass('dot_hover');
+        });
+
       })
       .mouseleave(function() { $("div").removeClass('dot_hover'); });
+
+  var visited_dot = {};
+  var district_counted = {};
+  var black_funds = 0;
+  var white_funds = 0;
+  $(".overlay_cell").each(function(n, elem) {
+    var dot = parse_dot(elem.id);
+    var district = district_of(board, dot.x, dot.y);
+    var district_id = $.map(district.dots, function(n) {return JSON.stringify(n);}).sort()[0];
+    $.each(district.dots, function(n, member) {
+      var member_id = dot_to_string(board, member);
+      if (visited_dot[member_id]) {
+        return;
+      }
+      visited_dot[member_id] = true;
+      if (Object.keys(district.open).length === 0) {
+        if (district.w_count > district.b_count) {
+          $('#' + member_id).addClass('white_won');
+          if (district.b_count !== 0) {
+            var funds = district.w_count - district.b_count;
+            if (funds > white_funds) {
+              white_funds = funds;
+            }
+          }
+          if (!district_counted[district_id]) {
+            ++score.white;
+          }
+        } else if (district.b_count > district.w_count) {
+          $('#' + member_id).addClass('black_won');
+          if (district.w_count !== 0) {
+            var funds = district.b_count - district.w_count;
+            if (funds > black_funds) {
+              black_funds = funds;
+            }
+          }
+          if (!district_counted[district_id]) {
+            ++score.black;
+          }
+        } else {
+          $('#' + member_id).addClass('dead_zone'); 
+          if (!district_counted[district_id]) {
+            ++score.tie;
+          }
+        }
+        district_counted[district_id] = true;        
+      }
+    });
+  });
+
+  $("#score_board").html("White:" + score.white +
+                         "&nbsp;&nbsp;&nbsp;Black:" + score.black +
+                         "&nbsp;&nbsp;&nbsp;Tie:" +score.tie );
+
+  while (black_funds > $('#private_tray .tile').length) {
+    draw_tile('private_tray', /*append=*/true);
+  }
+  $('#private_tray .tile').draggable();
+
+  if ($('#private_tray .tile').length === 0) {
+    draw_tile();
+  } else {
+    $('#public_tray').html("double-click to draw tile from bag");
+    $('#public_tray').dblclick(function() {
+      draw_tile();
+      $('#private_tray .tile').draggable('disable');      
+    });
+  }
+
+  if (last_move_id) {
+    $(last_move_id).addClass("last_move");
+  }
+  
   return board;
+}
+
+function make_random_move(board) {
+  var t = take_random(bag);
+  var r = Math.random() * 360;
+  var m = [];
+  each_cell(board, function(x, y, cell) {
+    if (cell && ('type' in cell) && cell.type === 'option') {
+      m.push([x,y,cell]);
+    }
+  });
+  var i = Math.floor(Math.random() * m.length);
+  tile_spin[t] = r;
+  place_tile(board, m[i][0], m[i][1], t);
 }
 
 var tile_groups = [
