@@ -23,7 +23,7 @@
       }
       
       .tile {
-      margin: 2px;
+      //margin: 2px;
       padding: 0px;
       border: 1px solid #667078;
       width: 78px;
@@ -36,7 +36,7 @@
       }
       
       .option {
-      margin: 2px;
+      //margin: 2px;
       padding: 1px;
       width: 78px;
       height: 78px;
@@ -45,22 +45,71 @@
       }
 
       .empty_cell {
-      margin: 2px;
+      //margin: 2px;
       padding: 1px;
       width: 78px;
       height: 78px;
+      display: inline-block;
+      }
+
+      #public_tray {
+      margin: 10px;
+      padding: 20px;
+      //border: 1px solid #667078;
+      width: 70%;
+      height: 100px;
+      position: relative;
+      }
+      
+      .control_panel {
+      padding: 25px;
+      }
+
+      #board_size_display {
+      margin: 10px;
+      }
+
+      .overlay_row {
+      }
+      
+      .overlay_cell {
+      width: 26px;
+      height: 26px;
+      position: relative;
       display: inline-block;
       }
     </style>
     <script src="tohyo.js"></script>
   </head>
   <body style="margin: 0; padding: 0; border: 0;">
+    <div class="control_panel">
+      <div id="size_slider"></div>
+    <div id="board_size_display">Board size: 5</div>
+    </div>
     <div id="board"></div>
+    <div id="public_tray"></div>
+    <div id="private_tray"></div>
+    <div id="preview_tray" style="display: none;"></div>
     <script>
       //setup();
-      var board = make_board(bag);
-      add_options(board);
+      $(function() { $( document ).tooltip(); });
+      $("#size_slider").slider({
+      min: 5, max: 12,
+      slide: function( event, ui ) {
+      max_width = ui.value;
+      max_height = ui.value;
+      update_options(board);
       render_board(board);
+      $("#board_size_display").text("Board size: " + ui.value);
+      },
+      stop: function( event, ui ) {
+      }
+      });
+      
+      var board = make_board(bag);
+      update_options(board);
+      render_board(board);
+      draw_tile();
     </script>
   </body>
 </html>

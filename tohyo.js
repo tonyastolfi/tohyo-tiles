@@ -2,17 +2,51 @@ var w = "<img class='dot' src='white_dot.png'/>";
 var b = "<img class='dot' src='black_dot.png'/>";
 var n = "<img class='dot' src='no_dot.png'/>";
 
-function make_tile(id, str) {
+var tile_blank = {};
+
+// The max z-index of any tile.
+//
+var max_z = 1000;
+
+function make_tile(id, str, rotate, placed) {
   var i = Math.floor(Math.random() * 6) + 1;
+  if (id in tile_blank) {
+    i = tile_blank[id];
+  } else {
+    tile_blank[id] = i;
+  }
+  if (rotate === undefined) {
+    rotate = 0;
+  }
+  if (placed) {
+    class_attr = "tile placed";
+  } else {
+    class_attr = "tile";
+  }
   return [
-    "<div class='tile' id='tile_", id.toString(), "'>",
-    "<div class='outer'><img class='container' src='tile_", i.toString(),
-    ".png'>", "<div class='container'>", eval(str.split('').join('+')),
+    "<div class='", class_attr, "' id='tile_", id.toString(), "' style='transform: rotate(",
+    rotate, "deg);'>", "<div class='outer'><img class='container' src='tile_",
+    i.toString(), ".png'>", "<div class='container'>",
+    eval(str.split('').join('+')), "</div>", "<div class='container'>",
+    "<div class='overlay_row'>",
+    "<span class='overlay_cell'></span><span class='overlay_cell'></span><span class='overlay_cell'></span>",
+    "</div>",
+    "<div class='overlay_row'>",
+    "<span class='overlay_cell'></span><span class='overlay_cell'></span><span class='overlay_cell'></span>",
+    "</div>",
+    "<div class='overlay_row'>",
+    "<span class='overlay_cell'></span><span class='overlay_cell'></span><span class='overlay_cell'></span>",
+    "</div>",
     "</div>", "</div>", "</div>"
   ].join('');
 }
 
-function make_option(id) { return "<div class='option' id='" + (id.toString()) + "'></div>"; }
+function make_option(id) {
+  return "<div class='option' id='" + (id.toString()) + "'></div>";
+}
+
+function tile_id(id) { return '#tile_' + id.toString(); }
+function $tile(id) { return $(tile_id(id)); }
 
 var tile_faces = [
   "nbbwwnnnn", "bnnbwnnnw", "bbbnwwwnn", "wwbnnbwnb", "bwbnwnwnb",
@@ -79,6 +113,7 @@ function setup() {
 }
 
 var bag = [];
+var tile_spin = {};
 
 var max_width = 5;
 var max_height = 5;
@@ -95,47 +130,6 @@ function take_random(bag) {
   return choice;
 }
 
-/*
-board state = {
-  cell: [{type: "tile"|"border"|"option", index: n, rotation: degrees}, ...]
-}
-*/
-/*
-function make_board(bag) {
-  var center = take_random(bag);
-
-  return {
-    "cell": [
-      {
-        "type": "tile",
-        "index": center,
-        "rotation": 0,
-        "north": 1,
-        "east": 2,
-        "south": 3,
-        "west": 4,
-      },
-      {
-        "type": "option",
-        "south": 0,
-      },
-      {
-        "type": "option",
-        "west": 0,
-      },
-      {
-        "type": "option",
-        "north": 0,
-      },
-      {
-        "type": "option",
-        "east": 0,
-      },
-    ]
-  };
-}
-*/
-
 function make_board(bag) {
   var center = take_random(bag);
   return {
@@ -143,39 +137,9 @@ function make_board(bag) {
       0 : {
         "type" : "tile",
         "index" : center,
+        "rotate" : 0,
       }
     }
-  };
-}
-
-function find_extents(board) {
-  var left = 10000, right = -10000, top = 10000, bottom = -10000;
-  for (var x in board) {
-    x = parseInt(x, 10);
-    var column = board[x];
-    if (x < left) {
-      left = x;
-    }
-    if (x > right) {
-      right = x;
-    }
-    for (var y in column) {
-      y = parseInt(y, 10);
-      if (y < top) {
-        top = y;
-      }
-      if (y > bottom) {
-        bottom = y;
-      }
-    }
-  }
-  return {
-    left : left,
-    right : right,
-    top : top,
-    bottom : bottom,
-    width : right - left + 1,
-    height : bottom - top + 1,
   };
 }
 
@@ -190,6 +154,86 @@ function each_cell(board, fn) {
   }
 }
 
+function find_extents(board) {
+  var placed = {
+    left : 10000,
+    right : -10000,
+    top : 10000,
+    bottom : -10000,
+  };
+  var revealed = {
+    left : 10000,
+    right : -10000,
+    top : 10000,
+    bottom : -10000,
+  };
+
+  function update_box(box, x, y) {
+    if (x < box.left) {
+      box.left = x;
+    }
+    if (x > box.right) {
+      box.right = x;
+    }
+    if (y < box.top) {
+      box.top = y;
+    }
+    if (y > box.bottom) {
+      box.bottom = y;
+    }
+    box.width = box.right - box.left + 1;
+    box.height = box.bottom - box.top + 1;
+  }
+
+  each_cell(board, function(x, y, cell) {
+    if (cell.type === "tile") {
+      update_box(placed, x, y);
+    }
+    update_box(revealed, x, y);
+  });
+
+  return {
+    placed : placed,
+    revealed : revealed,
+  };
+}
+
+function snap_to_90deg(angle) {
+  while (angle < 0) {
+    angle += 360;
+  }
+  return Math.floor(((angle + 45) % 360) / 90) * 90;
+}
+
+function dot_graph(face, rotate) {
+  var graph = {0 : {}, 1 : {}, 2 : {}};
+  var i = 0;
+  rotate = snap_to_90deg(rotate);
+  switch (rotate) {
+  case 0:
+    for (var y = 0; y < 3; ++y) {
+      for (var x = 0; x < 3; ++x) {
+        switch (face.charAt(i++)) {
+        case 'b':
+          graph[x][y] = 'b';
+          break;
+        case 'w':
+          graph[x][y] = 'w';
+          break;
+        }
+      }
+    }
+    break;
+  case 90:
+    break;
+  case 180:
+    break;
+  case 270:
+    break;
+  }
+  return graph;
+}
+
 function board_get(board, x, y) {
   if (!(x in board)) {
     return undefined;
@@ -200,35 +244,59 @@ function board_get(board, x, y) {
   return board[x][y];
 }
 
+function board_dot(board, x, y) {
+  var cell_x = Math.floor(x / 3);
+  var cell_y = Math.floor(y / 3);
+  var cell = board_get(board, cell_x, cell_y);
+  if (cell.type !== "tile") {
+    return undefined;
+  }
+  var cell_dots = dot_graph(tile_faces[cell.index], cell.rotate);
+  return cell_dots[x % 3][y % 3];
+}
+
 function board_put(board, x, y, cell) {
+  if (cell === undefined) {
+    if (x in board) {
+      delete board[x][y];
+    }
+    return;
+  }
   if (!(x in board)) {
     board[x] = {};
   }
   board[x][y] = cell;
 }
 
-function add_options(board) {
-  var extents = find_extents(board);
+function update_options(board) {
+  var extents = find_extents(board).placed;
   each_cell(board, function(x, y, cell) {
+    if (extents.width >= max_width && (x < extents.left || x > extents.right)) {
+      board_put(board, x, y, undefined);
+    }
+    if (extents.height >= max_height &&
+        (y < extents.top || y > extents.bottom)) {
+      board_put(board, x, y, undefined);
+    }
     if (cell["type"] !== "tile") {
       return;
     }
-    if (extents.width !== max_width || x !== extents.left) {
+    if (extents.width < max_width || x > extents.left) {
       if (board_get(board, x - 1, y) === undefined) {
         board_put(board, x - 1, y, {"type" : "option"});
       }
     }
-    if (extents.width !== max_width || x !== extents.right) {
+    if (extents.width < max_width || x < extents.right) {
       if (board_get(board, x + 1, y) === undefined) {
         board_put(board, x + 1, y, {"type" : "option"});
       }
     }
-    if (extents.height !== max_height || y !== extents.top) {
+    if (extents.height < max_height || y > extents.top) {
       if (board_get(board, x, y - 1) === undefined) {
         board_put(board, x, y - 1, {"type" : "option"});
       }
     }
-    if (extents.height !== max_height || y !== extents.bottom) {
+    if (extents.height < max_height || y < extents.bottom) {
       if (board_get(board, x, y + 1) === undefined) {
         board_put(board, x, y + 1, {"type" : "option"});
       }
@@ -237,9 +305,51 @@ function add_options(board) {
   return board;
 }
 
+function place_tile(board, x, y, tile_index) {
+  board_put(board, x, y, {
+    "type" : "tile",
+    "index" : tile_index,
+    "rotate" : snap_to_90deg(tile_spin[tile_index])
+  });
+  update_options(board);
+  render_board(board);
+}
+
+function draw_tile() {
+  // Pick a tile uniformly at random from the bag.
+  //
+  var t = take_random(bag);
+
+  // Add the tile to the public tray.
+  //
+  $("#public_tray").html(make_tile(t, tile_faces[t]));
+  $("#preview_tray").html(make_tile(t + "_preview", tile_faces[t]));
+
+  // Add behaviors: draggable, bring-to-front, spinnable.
+  //
+  $tile(t).draggable();
+
+  $tile(t).mousedown(function() { $(this).css('z-index', max_z++); });
+
+  tile_spin[t] = 0;
+  $tile(t).bind('mousewheel', function(e) {
+    e.preventDefault();
+    tile_spin[t] += e.originalEvent.wheelDelta / 12;
+    $(this).css('transform', 'rotate(' + tile_spin[t] + 'deg)');
+    $(this).css('z-index', max_z++);
+    $("#tile_" + t + "_preview")
+        .css("transform", "rotate(" + snap_to_90deg(tile_spin[t]) + "deg)");
+  });
+
+  $tile(t).attr('title', 'Tile Face: ' + t);
+}
+
 function render_board(board) {
+  // Generate the HTML for the board.
+  //
+  var tile_ids=[];
   var html = [];
-  var extents = find_extents(board);
+  var extents = find_extents(board).revealed;
   for (var y = extents.top; y <= extents.bottom; ++y) {
     html.push("<div>");
     for (var x = extents.left; x <= extents.right; ++x) {
@@ -247,14 +357,37 @@ function render_board(board) {
       if (cell === undefined) {
         html.push("<div class='empty_cell'></div>");
       } else if (cell["type"] === "tile") {
-        html.push(make_tile(cell["index"], tile_faces[cell["index"]]));
+        html.push(make_tile([ cell["index"], x, y ].join('_'),
+                            tile_faces[cell["index"]], cell["rotate"]));
       } else if (cell["type"] === "option") {
-        html.push(make_option("cell_"+x+"_"+y));
+        html.push(make_option("cell_" + x + "_" + y));
       }
     }
     html.push("</div>");
   }
+
+  // Replace the current board with the new HTML.
+  //
   $("#board").html(html.join(''));
+
+  // Add behavior.
+  //
+  // All "option" positions should be droppable.
+  //
+  $(".option").droppable({
+    drop : function(event, ui) {
+      var tile_elem = ui.draggable[0];
+      var dropped_tile = parseInt(tile_elem.id.split("_")[1], 10);
+      var parts = $(this)[0].id.split("_");
+      var x = parseInt(parts[1], 10);
+      var y = parseInt(parts[2], 10);
+      ui.draggable.remove();
+      place_tile(board, x, y, dropped_tile);
+      draw_tile();
+    }
+  });
+
+  return board;
 }
 
 var tile_groups = [
