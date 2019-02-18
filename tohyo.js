@@ -8,6 +8,30 @@ var tile_blank = {};
 //
 var max_z = 1000;
 
+function mod(x, m) {
+  if (x < 0) {
+    return (m - (-x % m)) % m;
+  }
+  return x % m;
+}
+
+function snap_to_90deg(angle) {
+  return Math.floor(mod(angle + 45, 360) / 90) * 90;
+}
+
+function rotate_xy(x, y, deg) {
+  switch (snap_to_90deg(deg)) {
+  case 0:
+    return [ x, y ];
+  case 90:
+    return [ 2 - y, x ];
+  case 180:
+    return [ 2 - x, 2 - y ];
+  case 270:
+    return [ y, 2 - x ];
+  }
+}
+
 function make_tile(id, str, rotate, placed) {
   var i = Math.floor(Math.random() * 6) + 1;
   if (id in tile_blank) {
@@ -23,21 +47,58 @@ function make_tile(id, str, rotate, placed) {
   } else {
     class_attr = "tile";
   }
+  var r = rotate;
   return [
-    "<div class='", class_attr, "' id='tile_", id.toString(), "' style='transform: rotate(",
-    rotate, "deg);'>", "<div class='outer'><img class='container' src='tile_",
-    i.toString(), ".png'>", "<div class='container'>",
-    eval(str.split('').join('+')), "</div>", "<div class='container'>",
-    "<div class='overlay_row'>",
-    "<span class='overlay_cell'></span><span class='overlay_cell'></span><span class='overlay_cell'></span>",
+    "<div class='",
+    class_attr,
+    "' id='tile_",
+    id.toString(),
+    "' style='transform: rotate(",
+    rotate,
+    "deg);'>",
+    "<div class='outer'><img class='container' src='tile_",
+    i.toString(),
+    ".png'>",
+    "<div class='container'>",
+    eval(str.split('').join('+')),
     "</div>",
-    "<div class='overlay_row'>",
-    "<span class='overlay_cell'></span><span class='overlay_cell'></span><span class='overlay_cell'></span>",
+    "<div class='container'>",   //
+    "<div class='overlay_row'>", //
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(0, 0, r)[0], rotate_xy(0, 0, r)[1] ].join('_'),
+    "'></div>",
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(1, 0, r)[0], rotate_xy(1, 0, r)[1] ].join('_'),
+    "'></div>",
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(2, 0, r)[0], rotate_xy(2, 0, r)[1] ].join('_'),
+    "'></div>",
+    "</div>",                    //
+    "<div class='overlay_row'>", //
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(0, 1, r)[0], rotate_xy(0, 1, r)[1] ].join('_'),
+    "'></div>",
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(1, 1, r)[0], rotate_xy(1, 1, r)[1] ].join('_'),
+    "'></div>",
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(2, 1, r)[0], rotate_xy(2, 1, r)[1] ].join('_'),
+    "'></div>",
+    "</div>",                    //
+    "<div class='overlay_row'>", //
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(0, 2, r)[0], rotate_xy(0, 2, r)[1] ].join('_'),
+    "'></div>",
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(1, 2, r)[0], rotate_xy(1, 2, r)[1] ].join('_'),
+    "'></div>",
+    "<div class='overlay_cell' id='dot_",
+    [ id.toString(), rotate_xy(2, 2, r)[0], rotate_xy(2, 2, r)[1] ].join('_'),
+    "'></div>",
+    "</div>", //
     "</div>",
-    "<div class='overlay_row'>",
-    "<span class='overlay_cell'></span><span class='overlay_cell'></span><span class='overlay_cell'></span>",
     "</div>",
-    "</div>", "</div>", "</div>"
+    "</div>"
   ].join('');
 }
 
@@ -78,7 +139,6 @@ var tile_faces = [
   "nbnwnwnbn", "wbbwbnnnw", "bnnnwnbwn", "wnbwwbnnb", "nwbwnnwbb",
   "wwnnnbbnn", "nnnbnnwwb", "bwnnnnnbw", "bnbnwnnnw", "bnbwnnwnn",
   "nbbbnwwwn", "nbnwnbnnw", "bbnnnnnww", "bnwnbnnnw"
-
 ];
 
 function setup() {
@@ -198,38 +258,23 @@ function find_extents(board) {
   };
 }
 
-function snap_to_90deg(angle) {
-  while (angle < 0) {
-    angle += 360;
-  }
-  return Math.floor(((angle + 45) % 360) / 90) * 90;
-}
-
 function dot_graph(face, rotate) {
   var graph = {0 : {}, 1 : {}, 2 : {}};
   var i = 0;
   rotate = snap_to_90deg(rotate);
-  switch (rotate) {
-  case 0:
-    for (var y = 0; y < 3; ++y) {
-      for (var x = 0; x < 3; ++x) {
-        switch (face.charAt(i++)) {
-        case 'b':
-          graph[x][y] = 'b';
-          break;
-        case 'w':
-          graph[x][y] = 'w';
-          break;
-        }
+  for (var y = 0; y < 3; ++y) {
+    for (var x = 0; x < 3; ++x) {
+      var tx = rotate_xy(x, y, rotate)[0];
+      var ty = rotate_xy(x, y, rotate)[1];
+      switch (face.charAt(i++)) {
+      case 'b':
+        graph[tx][ty] = 'b';
+        break;
+      case 'w':
+        graph[tx][ty] = 'w';
+        break;
       }
     }
-    break;
-  case 90:
-    break;
-  case 180:
-    break;
-  case 270:
-    break;
   }
   return graph;
 }
@@ -248,11 +293,11 @@ function board_dot(board, x, y) {
   var cell_x = Math.floor(x / 3);
   var cell_y = Math.floor(y / 3);
   var cell = board_get(board, cell_x, cell_y);
-  if (cell.type !== "tile") {
+  if (cell === undefined || cell.type !== "tile") {
     return undefined;
   }
   var cell_dots = dot_graph(tile_faces[cell.index], cell.rotate);
-  return cell_dots[x % 3][y % 3];
+  return cell_dots[mod(x, 3)][mod(y, 3)];
 }
 
 function board_put(board, x, y, cell) {
@@ -344,10 +389,54 @@ function draw_tile() {
   $tile(t).attr('title', 'Tile Face: ' + t);
 }
 
+function district_of(board, x, y) {
+  function key_of(x, y) { return [ x, y ].join('_'); }
+
+  var visited = {};
+  visited[key_of(x, y)] = true;
+  var stack = [ key_of(x, y) ];
+  var d = {w_count : 0, b_count : 0, dots : []};
+  while (stack.length > 0) {
+    var next = stack.pop();
+    var parts = next.split('_');
+    var x = parseInt(parts[0]), y = parseInt(parts[1]);
+    var dot = board_dot(board, x, y);
+    if (dot !== 'w' && dot !== 'b') {
+      continue;
+    }
+    switch (dot) {
+    case 'w':
+      d.w_count += 1;
+      break;
+    case 'b':
+      d.b_count += 1;
+      break;
+    }
+    d.dots.push([ x, y ]);
+    if (!(key_of(x - 1, y) in visited)) {
+      visited[key_of(x - 1, y)] = true;
+      stack.push(key_of(x - 1, y));
+    }
+    if (!(key_of(x + 1, y) in visited)) {
+      visited[key_of(x + 1, y)] = true;
+      stack.push(key_of(x + 1, y));
+    }
+    if (!(key_of(x, y - 1) in visited)) {
+      visited[key_of(x, y - 1)] = true;
+      stack.push(key_of(x, y - 1));
+    }
+    if (!(key_of(x, y + 1) in visited)) {
+      visited[key_of(x, y + 1)] = true;
+      stack.push(key_of(x, y + 1));
+    }
+  }
+  return d;
+}
+
 function render_board(board) {
   // Generate the HTML for the board.
   //
-  var tile_ids=[];
+  var tile_ids = [];
   var html = [];
   var extents = find_extents(board).revealed;
   for (var y = extents.top; y <= extents.bottom; ++y) {
@@ -358,7 +447,8 @@ function render_board(board) {
         html.push("<div class='empty_cell'></div>");
       } else if (cell["type"] === "tile") {
         html.push(make_tile([ cell["index"], x, y ].join('_'),
-                            tile_faces[cell["index"]], cell["rotate"]));
+                            tile_faces[cell["index"]], cell["rotate"],
+                            /*placed=*/true));
       } else if (cell["type"] === "option") {
         html.push(make_option("cell_" + x + "_" + y));
       }
@@ -387,6 +477,41 @@ function render_board(board) {
     }
   });
 
+  $(".tile.placed .overlay_cell")
+      .mouseenter(function() {
+        var i = $(this)[0].id;
+        var v = $.map($(i.split('_')), function(n) {
+                   return parseInt(n, 10);
+                 }).splice(1);
+        var x = v[1] * 3 + v[3];
+        var y = v[2] * 3 + v[4];
+        var d = district_of(board, x, y);
+        $("#private_tray").html([
+          i, ": ", board_dot(board, x, y), "<br>black: ", d.b_count,
+          "<br>white:", d.w_count
+        ].join(''));
+        console.log('------------------------');
+        for (var j = 0; j < d.dots.length; ++j) {
+          var cell_x = Math.floor(d.dots[j][0] / 3);
+          var cell_y = Math.floor(d.dots[j][1] / 3);
+          var inner_x = mod(d.dots[j][0], 3);
+          var inner_y = mod(d.dots[j][1], 3);
+          var tile_index = board_get(board, cell_x, cell_y).index;
+
+          var dot_id = [
+            "#dot",
+            tile_index.toString(),
+            cell_x.toString(),
+            cell_y.toString(),
+            inner_x.toString(),
+            inner_y.toString(),
+          ].join('_');
+          console.log(dot_id);
+          $(dot_id).addClass('dot_hover');
+        }
+        console.log('------------------------');
+      })
+      .mouseleave(function() { $("div").removeClass('dot_hover'); });
   return board;
 }
 
