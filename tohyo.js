@@ -393,14 +393,15 @@ function place_tile(board, x, y, tile_index) {
   });
   update_options(board);
   render_board(board);
-  last_move_id = ["#tile",tile_index.toString(), x.toString(), y.toString()].join('_');
+  last_move_id =
+      [ "#tile", tile_index.toString(), x.toString(), y.toString() ].join('_');
 }
 
 function draw_tile(dst_id, append) {
   if (!dst_id) {
     dst_id = 'public_tray';
   }
-  
+
   // Pick a tile uniformly at random from the bag.
   //
   var t = take_random(bag);
@@ -493,7 +494,7 @@ function district_of(board, x, y) {
 
 function render_board(board, score) {
   if (!score) {
-    score = {white: 0, black: 0, tie: 0};
+    score = {white : 0, black : 0, tie : 0};
   }
   // Generate the HTML for the board.
   //
@@ -534,7 +535,7 @@ function render_board(board, score) {
       var y = parseInt(parts[2], 10);
       ui.draggable.remove();
       place_tile(board, x, y, dropped_tile);
-      
+
       // Now the bot moves...
       //
       make_random_move(board);
@@ -567,7 +568,10 @@ function render_board(board, score) {
         });
 
       })
-      .mouseleave(function() { $("div").removeClass('dot_hover'); });
+      .mouseleave(function() {
+        $("div").removeClass('dot_hover');
+        $("#info_tray").html('');
+      });
 
   var visited_dot = {};
   var district_counted = {};
@@ -576,7 +580,9 @@ function render_board(board, score) {
   $(".overlay_cell").each(function(n, elem) {
     var dot = parse_dot(elem.id);
     var district = district_of(board, dot.x, dot.y);
-    var district_id = $.map(district.dots, function(n) {return JSON.stringify(n);}).sort()[0];
+    var district_id = $.map(district.dots, function(n) {
+                         return JSON.stringify(n);
+                       }).sort()[0];
     $.each(district.dots, function(n, member) {
       var member_id = dot_to_string(board, member);
       if (visited_dot[member_id]) {
@@ -607,24 +613,25 @@ function render_board(board, score) {
             ++score.black;
           }
         } else {
-          $('#' + member_id).addClass('dead_zone'); 
+          $('#' + member_id).addClass('dead_zone');
           if (!district_counted[district_id]) {
             ++score.tie;
           }
         }
-        district_counted[district_id] = true;        
+        district_counted[district_id] = true;
       }
     });
   });
 
-  $("#score_board").html("White:" + score.white +
-                         "&nbsp;&nbsp;&nbsp;Black:" + score.black +
-                         "&nbsp;&nbsp;&nbsp;Tie:" +score.tie );
+  $("#score_board")
+      .html("White:" + score.white + "&nbsp;&nbsp;&nbsp;Black:" + score.black +
+            "&nbsp;&nbsp;&nbsp;Tie:" + score.tie);
 
   while (black_funds > $('#private_tray .tile').length) {
     draw_tile('private_tray', /*append=*/true);
   }
   $('#private_tray .tile').draggable();
+  $('#private_tray .tile').draggable('enable');
 
   if ($('#private_tray .tile').length === 0) {
     draw_tile();
@@ -632,14 +639,18 @@ function render_board(board, score) {
     $('#public_tray').html("double-click to draw tile from bag");
     $('#public_tray').dblclick(function() {
       draw_tile();
-      $('#private_tray .tile').draggable('disable');      
+      $('#private_tray .tile').draggable('disable');
     });
   }
 
   if (last_move_id) {
     $(last_move_id).addClass("last_move");
   }
-  
+
+  $("#board").css('left', [
+    (window.innerWidth / 2 - extents.width * 40).toString(), "px"
+  ].join(''));
+
   return board;
 }
 
@@ -649,7 +660,7 @@ function make_random_move(board) {
   var m = [];
   each_cell(board, function(x, y, cell) {
     if (cell && ('type' in cell) && cell.type === 'option') {
-      m.push([x,y,cell]);
+      m.push([ x, y, cell ]);
     }
   });
   var i = Math.floor(Math.random() * m.length);
