@@ -218,10 +218,12 @@ for (var i = 0; i < 144; ++i) {
 }
 
 function take_random(bag) {
+  var before = bag.length;
   var i = Math.floor(Math.random() * bag.length);
   var choice = bag[i];
   bag[i] = bag[bag.length - 1];
   bag.pop();
+  console.log("bag.length=" + before + "->" + bag.length);
   return choice;
 }
 
@@ -386,6 +388,7 @@ function update_options(board) {
 }
 
 function place_tile(board, x, y, tile_index) {
+  //console.log("entered place_tile");
   board_put(board, x, y, {
     "type" : "tile",
     "index" : tile_index,
@@ -395,6 +398,7 @@ function place_tile(board, x, y, tile_index) {
   render_board(board);
   last_move_id =
       [ "#tile", tile_index.toString(), x.toString(), y.toString() ].join('_');
+  //console.log("leaving place_tile");
 }
 
 function draw_tile(dst_id, append) {
@@ -492,6 +496,18 @@ function district_of(board, x, y) {
   return d;
 }
 
+function black_to_play() {
+  if ($('#private_tray .tile').length === 0) {
+    draw_tile();
+  } else {
+    $('#public_tray').html("double-click to draw tile from bag");
+    $('#public_tray').dblclick(function() {
+      draw_tile();
+      $('#private_tray .tile').draggable('disable');
+    });
+  }      
+}
+
 function render_board(board, score) {
   if (!score) {
     score = {white : 0, black : 0, tie : 0};
@@ -540,6 +556,10 @@ function render_board(board, score) {
       //
       make_random_move(board);
       render_board(board);
+
+      // Now it's back to the human...
+      //
+      black_to_play();
     }
   });
 
@@ -627,21 +647,13 @@ function render_board(board, score) {
       .html("White:" + score.white + "&nbsp;&nbsp;&nbsp;Black:" + score.black +
             "&nbsp;&nbsp;&nbsp;Tie:" + score.tie);
 
+  //console.log("black_funds=" + black_funds);
+  //console.log("in black tray=" + ($('#private_tray .tile').length));
   while (black_funds > $('#private_tray .tile').length) {
     draw_tile('private_tray', /*append=*/true);
   }
   $('#private_tray .tile').draggable();
   $('#private_tray .tile').draggable('enable');
-
-  if ($('#private_tray .tile').length === 0) {
-    draw_tile();
-  } else {
-    $('#public_tray').html("double-click to draw tile from bag");
-    $('#public_tray').dblclick(function() {
-      draw_tile();
-      $('#private_tray .tile').draggable('disable');
-    });
-  }
 
   if (last_move_id) {
     $(last_move_id).addClass("last_move");
@@ -655,6 +667,7 @@ function render_board(board, score) {
 }
 
 function make_random_move(board) {
+  //console.log("entered make_random_move");
   var t = take_random(bag);
   var r = Math.random() * 360;
   var m = [];
@@ -666,6 +679,7 @@ function make_random_move(board) {
   var i = Math.floor(Math.random() * m.length);
   tile_spin[t] = r;
   place_tile(board, m[i][0], m[i][1], t);
+  //console.log("leaving make_random_move");
 }
 
 var tile_groups = [
