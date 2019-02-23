@@ -3,6 +3,11 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <!--
+    <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+    <script src="http://code.jquery.com/ui/1.8.21/jquery-ui.min.js"></script>
+    -->
+    <script src="jquery.ui.touch-punch.min.js"></script>
     <style>
       .dot {
       width: 24px;
@@ -141,6 +146,8 @@
     <div id="public_tray"></div>
     <div id="private_tray"></div>
     <div id="preview_tray" style="display: none;"></div>
+    <img id="spin_left" style="left:0px; bottom: 25%; position: fixed; width: 100px; height: 100px;" src="spin_left.png">
+    <img id="spin_right" style="right:0px; bottom: 25%; position: fixed; width: 100px; height: 100px;" src="spin_right.png">
     <script>
       //setup();
       $(function() { $( document ).tooltip(); });
@@ -160,6 +167,7 @@
       var board = make_board(bag);
       update_options(board);
       render_board(board);
+      init_spin_buttons();
       black_to_play();
     </script>
   </body>

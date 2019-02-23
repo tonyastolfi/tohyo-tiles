@@ -190,6 +190,7 @@ function setup() {
     $('#tile_' + i).draggable();
     $('#tile_' + i).mousedown(function() {
       $(this).css('z-index', d);
+      focus_tile = i;
       d++;
     });
 
@@ -200,6 +201,7 @@ function setup() {
         spin += e.originalEvent.wheelDelta / 12;
         $(this).css('transform', 'rotate(' + spin + 'deg)');
         $(this).css('z-index', d);
+        focus_tile = i;
         d++;
       })
     })();
@@ -212,6 +214,7 @@ var tile_spin = {};
 
 var max_width = 5;
 var max_height = 5;
+var focus_tile = undefined;
 
 for (var i = 0; i < 144; ++i) {
   bag[i] = i;
@@ -388,7 +391,7 @@ function update_options(board) {
 }
 
 function place_tile(board, x, y, tile_index) {
-  //console.log("entered place_tile");
+  // console.log("entered place_tile");
   board_put(board, x, y, {
     "type" : "tile",
     "index" : tile_index,
@@ -398,17 +401,18 @@ function place_tile(board, x, y, tile_index) {
   render_board(board);
   last_move_id =
       [ "#tile", tile_index.toString(), x.toString(), y.toString() ].join('_');
-  //console.log("leaving place_tile");
+  // console.log("leaving place_tile");
 }
 
 function draw_tile(dst_id, append) {
-  if (!dst_id) {
-    dst_id = 'public_tray';
-  }
-
   // Pick a tile uniformly at random from the bag.
   //
   var t = take_random(bag);
+
+  if (!dst_id) {
+    dst_id = 'public_tray';
+    focus_tile = t;
+  }
 
   // Add the tile to the public tray.
   //
@@ -424,7 +428,10 @@ function draw_tile(dst_id, append) {
   //
   $tile(t).draggable();
 
-  $tile(t).mousedown(function() { $(this).css('z-index', max_z++); });
+  $tile(t).mousedown(function() {
+    $(this).css('z-index', max_z++);
+    focus_tile = t;
+  });
 
   tile_spin[t] = 0;
   $tile(t).bind('mousewheel', function(e) {
@@ -432,6 +439,7 @@ function draw_tile(dst_id, append) {
     tile_spin[t] += e.originalEvent.wheelDelta / 12;
     $(this).css('transform', 'rotate(' + tile_spin[t] + 'deg)');
     $(this).css('z-index', max_z++);
+    focus_tile = t;
     $("#tile_" + t + "_preview")
         .css("transform", "rotate(" + snap_to_90deg(tile_spin[t]) + "deg)");
   });
@@ -505,7 +513,7 @@ function black_to_play() {
       draw_tile();
       $('#private_tray .tile').draggable('disable');
     });
-  }      
+  }
 }
 
 function render_board(board, score) {
@@ -647,8 +655,8 @@ function render_board(board, score) {
       .html("White:" + score.white + "&nbsp;&nbsp;&nbsp;Black:" + score.black +
             "&nbsp;&nbsp;&nbsp;Tie:" + score.tie);
 
-  //console.log("black_funds=" + black_funds);
-  //console.log("in black tray=" + ($('#private_tray .tile').length));
+  // console.log("black_funds=" + black_funds);
+  // console.log("in black tray=" + ($('#private_tray .tile').length));
   while (black_funds > $('#private_tray .tile').length) {
     draw_tile('private_tray', /*append=*/true);
   }
@@ -667,7 +675,7 @@ function render_board(board, score) {
 }
 
 function make_random_move(board) {
-  //console.log("entered make_random_move");
+  // console.log("entered make_random_move");
   var t = take_random(bag);
   var r = Math.random() * 360;
   var m = [];
@@ -679,7 +687,7 @@ function make_random_move(board) {
   var i = Math.floor(Math.random() * m.length);
   tile_spin[t] = r;
   place_tile(board, m[i][0], m[i][1], t);
-  //console.log("leaving make_random_move");
+  // console.log("leaving make_random_move");
 }
 
 var tile_groups = [
@@ -828,3 +836,38 @@ var tile_groups = [
   {"i" : 142, "left" : "-477px", "top" : "-20px"},
   {"i" : 143, "left" : "583px", "top" : "-819px"},
 ];
+
+var latest_spin = 0;
+
+function init_spin_buttons() {
+  $("#spin_left").click(function() {
+    if (focus_tile === undefined) {
+      return;
+    }
+    var this_spin = ++latest_spin;
+    for (var n = 0; n < 10; ++n) {
+      window.setTimeout(function() {
+        if (this_spin === latest_spin) {
+          tile_spin[focus_tile] -= 9;
+          $tile(focus_tile)
+              .css('transform', 'rotate(' + tile_spin[focus_tile] + 'deg)');
+        }
+      }, 10 * n);
+    }
+  });
+  $("#spin_right").click(function() {
+    if (focus_tile === undefined) {
+      return;
+    }
+    var this_spin = ++latest_spin;
+    for (var n = 0; n < 10; ++n) {
+      window.setTimeout(function() {
+        if (this_spin === latest_spin) {
+          tile_spin[focus_tile] += 9;
+          $tile(focus_tile)
+              .css('transform', 'rotate(' + tile_spin[focus_tile] + 'deg)');
+        }
+      }, 10 * n);
+    }
+  });
+}
